@@ -12,7 +12,7 @@
 
 using namespace std;
 
-#define DEBUG
+#define DEBUGG
 
 #ifdef DEBUG
 	#define debugOut cout
@@ -40,7 +40,7 @@ struct Variable {
 	bool unit;
 	bool unit_sign;
 	int dlevel;
-	vector<int>* reason;
+	vector<int> reason;
 	vector<vector<int>> watches[2];
 	void setUnit(bool _sign) {
 		unit = true;
@@ -53,7 +53,7 @@ struct Variable {
 		unit = false;
 		unit_sign = false;
 		dlevel = 0;
-		reason = NULL;
+		reason.clear();
 		watches[0].clear();
 		watches[1].clear();
 	}
@@ -96,18 +96,12 @@ inline void literalAddWatch(State& s, int literal, vector<int>& clause) {
 	v.watches[literalGetSign(literal)].push_back(vector<int>(clause));
 }
 
-inline void literalSet(State& s, int literal, vector<int>* reason) {
-	debugOut << "set " << literal << " with reason = ";
-	if (reason == NULL) debugOut << "NULL" << endl;
-	else  for (int x = 0; x < reason->size(); x++) debugOut << (*reason)[x] << " ";
-	debugOut << endl;
-
-
-
+inline void literalSet(State& s, int literal, vector<int>& reason) {
 	Variable& v = literalGetVar(s, literal);
 	v.sign = literalGetSign(literal);
 	v.set = true;
 	v.dlevel = s.dlevel;
+	v.reason.clear();
 	v.reason = reason;
 	s.trail.push_back(literal);
 }
@@ -149,22 +143,22 @@ int satSelectLiteral(State& s) {
 	return literal;
 }
 
-vector<int>* satBacktrack(State& s, vector<int>* reason) {
+vector<int> satBacktrack(State& s, vector<int>& reason) {
     vector<int> conflicts;
 
     // Level 0 failure; no work to do.
     if (s.dlevel == 0)
-        return NULL;
+        return vector<int>();
 
     // Mark literals in reason:
     int count = 0;
-    for (int i = 0; i < reason->size(); i++) {
-        Variable& v = literalGetVar(s, (*reason)[i]);
+    for (int i = 0; i < reason.size(); i++) {
+        Variable& v = literalGetVar(s, reason[i]);
         if (v.dlevel == 0)
             continue;
         v.mark = true;
         if (v.dlevel < s.dlevel)
-            conflicts.push_back((*reason)[i]);
+            conflicts.push_back(reason[i]);
         else count++;
     }
 
@@ -173,7 +167,7 @@ vector<int>* satBacktrack(State& s, vector<int>* reason) {
     int literal;
     do {
         if (tlevel < 0)
-            return NULL;
+            return vector<int>();
         literal = s.trail[tlevel--];
         Variable& v = literalGetVar(s, literal);
         v.set = false;
@@ -181,8 +175,8 @@ vector<int>* satBacktrack(State& s, vector<int>* reason) {
         v.mark = false;
         count--;
         if (count <= 0) break;
-        for (int i = 1; i < v.reason->size(); i++) {
-            literal = (*v.reason)[i];
+        for (int i = 1; i < v.reason.size(); i++) {
+            literal = v.reason[i];
             Variable& w = literalGetVar(s, literal);
             if (w.mark || w.dlevel == 0)
                 continue;
@@ -196,27 +190,26 @@ vector<int>* satBacktrack(State& s, vector<int>* reason) {
     while (true);
 
     // Simplify the conflicts; create the no-good.
-    vector<int>* nogood = new vector<int>;
-    nogood->push_back(-literal);
+    vector<int> nogood;
+    nogood.push_back(-literal);
     int blevel = 0;
 
     for (int i = 0; i < conflicts.size(); i++) {
 
         literal = conflicts[i];
         Variable& v = literalGetVar(s, literal);
-        debugOut << "get literal: " << literal << endl;
-        if (v.reason != NULL) {
+        if (v.reason != vector<int>()) {
             int k;
-            for (k = 1; k < v.reason->size() && literalGetMark(s, (*v.reason)[k]); k++) {}
-            if (k >= v.reason->size())
+            for (k = 1; k < v.reason.size() && literalGetMark(s, v.reason[k]); k++) {}
+            if (k >= v.reason.size())
                 continue;
         }
 
-        nogood->push_back(literal);
+        nogood.push_back(literal);
         if (blevel < v.dlevel) {
             blevel = v.dlevel;
-            (*nogood)[nogood->size() - 1] = (*nogood)[1];
-            (*nogood)[1] = literal;
+            nogood[nogood.size() - 1] = nogood[1];
+            nogood[1] = literal;
         }
     }
 
@@ -238,15 +231,16 @@ vector<int>* satBacktrack(State& s, vector<int>* reason) {
     }
 
     // Add the no-good clause:
-    satAddClause(s, *nogood);
+    satAddClause(s, nogood);
     s.dlevel = blevel;
     if (s.empty)
-        return NULL;
+        return vector<int>();
 
     return nogood;
 }
 
-bool satUnitPropagate(State&s, int literal, vector<int>* reason) {
+bool satUnitPropagate(State&s, int literal, vector<int> xxx) {
+	vector<int> reason;
 	int curr, next;
 	int restart;
 	do {
@@ -257,13 +251,11 @@ bool satUnitPropagate(State&s, int literal, vector<int>* reason) {
 
 		restart = false;
 		while (curr < next) {
-			debugOut << "ploop with lit: " << literal << endl;
-
 			literal = s.trail[curr];
 			curr++;
 			literal = -literal;
 			Variable& v = literalGetVar(s, literal);
-			vector<vector<int>> watch = v.watches[literalGetSign(literal)];
+			vector<vector<int>>& watch = v.watches[literalGetSign(literal)];
 
 			for (int i = 0; i < watch.size(); i++) {
 
@@ -283,18 +275,18 @@ bool satUnitPropagate(State&s, int literal, vector<int>* reason) {
 							clause[0] = watch_lit;
 							clause[1] = literal;
 						}
-						literalSet(s, watch_lit, &clause);
+						literalSet(s, watch_lit, clause);
 						next++;
 						continue;
 					}
-					reason = satBacktrack(s, &clause);
+					reason = satBacktrack(s, clause);
 
-					if (reason == NULL || reason->size() == 0) return false;
-					literal = (*reason)[0];
+					if (reason.size() == 0) return false;
+					literal = reason[0];
 					restart = true;
 					break;
 				}
-				debugOut << "pforfor end" << endl;
+
 				int new_lit = clause[j];
 				clause[int(!watch_idx)] = new_lit;
 				clause[j] = literal;
@@ -324,18 +316,17 @@ bool satSolve(int num_vars, vector<vector<int>> clauses) {
 		Variable v = s.vars[i];
 		if (v.unit) {
 			int literal = (v.unit_sign ? -i : i);
-			if (!satUnitPropagate(s, literal, NULL))
+			if (!satUnitPropagate(s, literal, vector<int>()))
 				return false;
 		}
 	}
 
-	debugOut << "Befor main loop" << endl;
 	for (s.dlevel = 1; true; s.dlevel++) {
 		int literal = satSelectLiteral(s);
 		if (literal == 0)
 			return true;
 
-		if (!satUnitPropagate(s, literal, NULL))
+		if (!satUnitPropagate(s, literal, vector<int>()))
 			return false;
 	}
 	return true;
