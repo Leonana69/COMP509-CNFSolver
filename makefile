@@ -1,11 +1,14 @@
 CC = g++
 CFLAGS = -I
 
-CNF: main.o
-	$(CC) -o CNF main.o -std=c++11
+CNF: cnf.o debug.o cnf.h debug.h
+	$(CC) -o CNF main.cpp cnf.o debug.o -std=c++11
 
-main.o: main.cpp
-	$(CC) -c main.cpp -std=c++11
+cnf.o: cnf.cpp cnf.h debug.h
+	$(CC) -c cnf.cpp -std=c++11
+
+debug.o: debug.h debug.cpp
+	$(CC) -c debug.cpp -std=c++11
 
 clean:
 	-rm $(objects) *.o CNF
