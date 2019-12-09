@@ -5,6 +5,8 @@
 
 #include "cnf.h"
 #include "debug.h"
+#include <chrono>
+
 using namespace std;
 
 #ifndef DEBUG
@@ -32,22 +34,28 @@ int main(int argc, char const *argv[]) {
 		return -1;
 	}
 
-	CNF instance(stream);
+	auto start = chrono::high_resolution_clock::now();
+
+	CNF instance(stream, 0);
+
+	auto elapsed = chrono::high_resolution_clock::now() - start;
+	float microseconds = chrono::duration_cast<std::chrono::microseconds>(elapsed).count() / 1000000.0;
+	cout << "Time: " << microseconds << endl;
+	cout << "Calls: " << instance.numberOfCalls() << endl;
 	if (instance.satisfiable()) {
 		cout << "SAT" << endl;
 		int sum = 0;
 		int set = 0;
-		for (int i = 1; i <= instance.numOfVars(); i++) {
-			cout << "p" << i << ": " << !instance.propGetVar(i).sign << endl;
-			sum += instance.propIsFalse(i);
-			set += instance.propGetVar(i).set;
-		}
+		// for (int i = 1; i <= instance.numOfVars(); i++) {
+		// 	cout << "p" << i << ": " << !instance.propGetVar(i).sign << endl;
+		// 	sum += instance.propIsFalse(i);
+		// 	set += instance.propGetVar(i).set;
+		// }
 		debugOut << set << endl;
 		debugOut << sum << endl;
 
 	} else {
 		cout << "UNSAT" << endl;
 	}
-
 	return 0;
 }
