@@ -6,6 +6,8 @@
 #include "cnf.h"
 #include "debug.h"
 #include <chrono>
+#include <algorithm>
+#include <iostream>
 
 using namespace std;
 
@@ -26,6 +28,7 @@ Optional flags:\n\
 
 void loadCNF(FILE* stream, int& num_props, vector<vector<int>>& clauses);
 void randomCNF(int N, int L, vector<vector<int>>& clauses);
+void test(int N, vector<vector<int>>& clauses);
 
 int main(int argc, char const *argv[]) {
 	int flag_inputFile;
@@ -63,13 +66,13 @@ int main(int argc, char const *argv[]) {
 		}
 		loadCNF(stream, num_props, clauses);
 	} else {
-		randomCNF(num_props, 3 * num_props, clauses);
+		
+		test(num_props, clauses);
+		return 0;
 	}
 
 	start = chrono::high_resolution_clock::now();
-
 	CNF instance(num_props, clauses, 0);
-
 	elapsed = chrono::high_resolution_clock::now() - start;
 	float microseconds = chrono::duration_cast<std::chrono::microseconds>(elapsed).count() / 1000000.0;
 	cout << "Time: " << microseconds << endl;
@@ -91,9 +94,46 @@ int main(int argc, char const *argv[]) {
 	return 0;
 }
 
+void test(int N, vector<vector<int>>& clauses) {
+	int result;
+	double times[100];
+	double atimes;
+	int calls[100];
+	int acalls;
+	auto start = chrono::high_resolution_clock::now();
+	auto elapsed = chrono::high_resolution_clock::now() - start;
+	srand(time(0)); // there can only be one srand
+	for (int j = 0; j < 16; j++) {
+		result = 0;
+		atimes = 0;
+		acalls = 0;
+		memset(times, 0, sizeof(times));
+		memset(calls, 0, sizeof(calls));
+		int L = (3 + j * 0.2) * N;
+
+		for (int i = 0; i < 100; i++) {
+			randomCNF(N, L, clauses);
+			start = chrono::high_resolution_clock::now();
+			CNF* instance = new CNF(N, clauses, 2);
+			elapsed = chrono::high_resolution_clock::now() - start;
+			times[i] = chrono::duration_cast<std::chrono::microseconds>(elapsed).count() / 1000000.0;
+			calls[i] = instance->numberOfCalls();
+			atimes += times[i];
+			acalls += calls[i];
+			result += instance->satisfiable();
+			delete instance;
+		}
+		sort(times, times + 100);
+		sort(calls, calls + 100);
+
+		printf("L/N = %d/%d, mtime: %.6lf, atime: %.6lf, mcalls: %3d, acalls: %.1f, sat probability: %.3lf\n", L, N, times[50], (double) atimes/100.0, calls[50], (float) acalls/100.0, (float)result / 100.0);
+	}
+
+}
+
 // generate random 3-CNF formula
 void randomCNF(int N, int L, vector<vector<int>>& clauses) {
-	srand(time(0));
+	clauses.clear();
 	vector<int> vtmp;
 	for (int i = 0; i < L; i++) {
 		vtmp.clear();

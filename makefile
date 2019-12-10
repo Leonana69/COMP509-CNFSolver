@@ -1,7 +1,7 @@
 CC = g++
 CFLAGS = -I
 
-CNF: cnf.o debug.o cnf.h debug.h
+CNF: cnf.o debug.o cnf.h debug.h main.cpp
 	$(CC) -o CNF main.cpp cnf.o debug.o -std=c++11
 
 GEN: generator.cpp
