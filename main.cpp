@@ -95,40 +95,73 @@ int main(int argc, char const *argv[]) {
 }
 
 void test(int N, vector<vector<int>>& clauses) {
-	int result;
-	double times[100];
-	double atimes;
-	int calls[100];
-	int acalls;
+	int result[16];
+	double times[3][16][100];
+	int calls[3][16][100];
 	auto start = chrono::high_resolution_clock::now();
 	auto elapsed = chrono::high_resolution_clock::now() - start;
 	srand(time(0)); // there can only be one srand
+	memset(result, 0, sizeof(result));
+	memset(times, 0, sizeof(times));
+	memset(calls, 0, sizeof(calls));
+	CNF* instance;
 	for (int j = 0; j < 16; j++) {
-		result = 0;
-		atimes = 0;
-		acalls = 0;
-		memset(times, 0, sizeof(times));
-		memset(calls, 0, sizeof(calls));
+		cout << " j = " << j << "\n";
 		int L = (3 + j * 0.2) * N;
 
 		for (int i = 0; i < 100; i++) {
-			randomCNF(N, L, clauses);
+			randomCNF(N, L, clauses); // generate once for the following three methods
+			// start = chrono::high_resolution_clock::now();
+			// instance = new CNF(N, clauses, 0);
+			// elapsed = chrono::high_resolution_clock::now() - start;
+			// times[0][j][i] = chrono::duration_cast<std::chrono::microseconds>(elapsed).count() / 1000000.0;
+			// calls[0][j][i] = instance->numberOfCalls();
+			// result[j] += instance->satisfiable();
+			
+			// delete instance;
+
 			start = chrono::high_resolution_clock::now();
-			CNF* instance = new CNF(N, clauses, 2);
+			instance = new CNF(N, clauses, 1);
 			elapsed = chrono::high_resolution_clock::now() - start;
-			times[i] = chrono::duration_cast<std::chrono::microseconds>(elapsed).count() / 1000000.0;
-			calls[i] = instance->numberOfCalls();
-			atimes += times[i];
-			acalls += calls[i];
-			result += instance->satisfiable();
+			times[1][j][i] = chrono::duration_cast<std::chrono::microseconds>(elapsed).count() / 1000000.0;
+			calls[1][j][i] = instance->numberOfCalls();
+			result[j] += instance->satisfiable();
+			delete instance;
+
+			start = chrono::high_resolution_clock::now();
+			instance = new CNF(N, clauses, 2);
+			elapsed = chrono::high_resolution_clock::now() - start;
+			times[2][j][i] = chrono::duration_cast<std::chrono::microseconds>(elapsed).count() / 1000000.0;
+			calls[2][j][i] = instance->numberOfCalls();
+
 			delete instance;
 		}
-		sort(times, times + 100);
-		sort(calls, calls + 100);
+		
+	}
+	cout << "Random selector:" << endl;
+	for (int j = 0; j < 16; j++) {
+		int L = (3 + j * 0.2) * N;
+		sort(times[0][j], times[0][j] + 100);
+		sort(calls[0][j], calls[0][j] + 100);
+		printf("L/N = %d/%d, mtime: %.6lf, mcalls: %3d, sat probability: %.3lf\n", L, N, times[0][j][50], calls[0][j][50], (float)result[j] / 100.0);
+	}
+	cout << "Two clauses selector:" << endl;
 
-		printf("L/N = %d/%d, mtime: %.6lf, atime: %.6lf, mcalls: %3d, acalls: %.1f, sat probability: %.3lf\n", L, N, times[50], (double) atimes/100.0, calls[50], (float) acalls/100.0, (float)result / 100.0);
+	for (int j = 0; j < 16; j++) {
+		int L = (3 + j * 0.2) * N;
+		sort(times[1][j], times[1][j] + 100);
+		sort(calls[1][j], calls[1][j] + 100);
+		printf("L/N = %d/%d, mtime: %.6lf, mcalls: %3d, sat probability: %.3lf\n", L, N, times[1][j][50], calls[1][j][50], (float)result[j] / 100.0);
 	}
 
+	cout << "Two clauses with pos selector:" << endl;
+
+	for (int j = 0; j < 16; j++) {
+		int L = (3 + j * 0.2) * N;
+		sort(times[2][j], times[2][j] + 100);
+		sort(calls[2][j], calls[2][j] + 100);
+		printf("L/N = %d/%d, mtime: %.6lf, mcalls: %3d, sat probability: %.3lf\n", L, N, times[2][j][50], calls[2][j][50], (float)result[j] / 100.0);
+	}
 }
 
 // generate random 3-CNF formula
@@ -139,7 +172,9 @@ void randomCNF(int N, int L, vector<vector<int>>& clauses) {
 		vtmp.clear();
 		int a = rand() % N + 1;
 		int b = rand() % N + 1;
+		while (b == a) b = rand() % N + 1;
 		int c = rand() % N + 1;
+		while (c == b || c == a) c = rand() % N + 1;
 		int sa = (((float)rand() / RAND_MAX) > 0.5 ? -1 : 1);
 		int sb = (((float)rand() / RAND_MAX) > 0.5 ? -1 : 1);
 		int sc = (((float)rand() / RAND_MAX) > 0.5 ? -1 : 1);
