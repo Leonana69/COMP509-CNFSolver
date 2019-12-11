@@ -22,16 +22,23 @@ const char usage[] = {
 Required arguments:\n\
 \tfilename can be absolute or relative path to the input file\n\n\
 Optional flags:\n\
-\t-i\tsolve the input file\n\
-\t-g\tgenerate test, input a number of propositions N\n"
+\t-s\toutput the assignment (if it's satisfiable), this can not be used with -g\n\
+\t-i [F]\tsolve the input file F, this can not be used with -g\n\
+\t-g [N]\tgenerate test, input a number of propositions N\n\
+\t-r\tdo not run the random solution\n"
 };
 
 void loadCNF(FILE* stream, int& num_props, vector<vector<int>>& clauses);
 void randomCNF(int N, int L, vector<vector<int>>& clauses);
 void test(int N, vector<vector<int>>& clauses);
 
+bool run_random = true;
+
 int main(int argc, char const *argv[]) {
 	int flag_inputFile;
+	int index_inputFile;
+	
+	bool show_res = false;
 	int num_props;
 	vector<vector<int>> clauses;
 	auto start = chrono::high_resolution_clock::now();
@@ -43,24 +50,37 @@ int main(int argc, char const *argv[]) {
 		return -1;
 	}
 
-	if (argv[1][0] == '-') {
-		switch (argv[1][1]) {
-			case 'g':
-				num_props = atoi(argv[2]);
-				flag_inputFile = 0;
-				break;
-			case 'i':
-				flag_inputFile = 1;
-				break;
-			default:
-				fprintf(stderr, "Error: unknown flags.\n");
-				return -1;
+	for (int i = 1; i < argc; i++) {
+		if (argv[i][0] == '-') {
+			switch (argv[i][1]) {
+				case 'g':
+					num_props = atoi(argv[i + 1]);
+					i++;
+					flag_inputFile = 0;
+					break;
+				case 'i':
+					flag_inputFile = 1;
+					index_inputFile = i + 1;
+					i++;
+					break;
+				case 's':
+					show_res = true;
+					break;
+				case 'r':
+					run_random = false;
+					break;
+				default:
+					fprintf(stderr, "Error: unknown flags.\n");
+					return -1;
+			}
 		}
 	}
 
+	
+
 	if (flag_inputFile) {
 		FILE* stream;
-		if ((stream = fopen(argv[2], "r")) == NULL) {
+		if ((stream = fopen(argv[index_inputFile], "r")) == NULL) {
 			fprintf(stderr, "Error: bad filename.\n");
 			return -1;
 		}
@@ -81,11 +101,12 @@ int main(int argc, char const *argv[]) {
 		cout << "SAT" << endl;
 		// int sum = 0;
 		// int set = 0;
-		// for (int i = 1; i <= instance.numOfVars(); i++) {
-		// 	cout << "p" << i << ": " << !instance.propGetVar(i).sign << endl;
-		// 	sum += instance.propIsFalse(i);
-		// 	set += instance.propGetVar(i).set;
-		// }
+		if (show_res)
+			for (int i = 1; i <= instance.numOfVars(); i++) {
+				cout << "p" << i << ": " << !instance.propGetVar(i).sign << endl;
+				// sum += instance.propIsFalse(i);
+				// set += instance.propGetVar(i).set;
+			}
 		// debugOut << set << endl;
 		// debugOut << sum << endl;
 	} else {
@@ -111,14 +132,15 @@ void test(int N, vector<vector<int>>& clauses) {
 
 		for (int i = 0; i < 100; i++) {
 			randomCNF(N, L, clauses); // generate once for the following three methods
-			// start = chrono::high_resolution_clock::now();
-			// instance = new CNF(N, clauses, 0);
-			// elapsed = chrono::high_resolution_clock::now() - start;
-			// times[0][j][i] = chrono::duration_cast<std::chrono::microseconds>(elapsed).count() / 1000000.0;
-			// calls[0][j][i] = instance->numberOfCalls();
-			// result[j] += instance->satisfiable();
-			
-			// delete instance;
+
+			if (run_random) {
+				start = chrono::high_resolution_clock::now();
+				instance = new CNF(N, clauses, 0);
+				elapsed = chrono::high_resolution_clock::now() - start;
+				times[0][j][i] = chrono::duration_cast<std::chrono::microseconds>(elapsed).count() / 1000000.0;
+				calls[0][j][i] = instance->numberOfCalls();
+				delete instance;
+			}
 
 			start = chrono::high_resolution_clock::now();
 			instance = new CNF(N, clauses, 1);
@@ -138,13 +160,16 @@ void test(int N, vector<vector<int>>& clauses) {
 		}
 		
 	}
-	cout << "Random selector:" << endl;
-	for (int j = 0; j < 16; j++) {
-		int L = (3 + j * 0.2) * N;
-		sort(times[0][j], times[0][j] + 100);
-		sort(calls[0][j], calls[0][j] + 100);
-		printf("L/N = %d/%d, mtime: %.6lf, mcalls: %3d, sat probability: %.3lf\n", L, N, times[0][j][50], calls[0][j][50], (float)result[j] / 100.0);
+	if (run_random) {
+		cout << "Random selector:" << endl;
+		for (int j = 0; j < 16; j++) {
+			int L = (3 + j * 0.2) * N;
+			sort(times[0][j], times[0][j] + 100);
+			sort(calls[0][j], calls[0][j] + 100);
+			printf("L/N = %d/%d, mtime: %.6lf, mcalls: %3d, sat probability: %.3lf\n", L, N, times[0][j][50], calls[0][j][50], (float)result[j] / 100.0);
+		}
 	}
+	
 	cout << "Two clauses selector:" << endl;
 
 	for (int j = 0; j < 16; j++) {
